@@ -32,75 +32,98 @@ This project demonstrates how GenAI and automation can reduce manual triage work
 | Containerisation | Docker, Docker Compose |
 
 ## Project Structure
+
+```
 sam4-incident-copilot/
+│
 ├── backend/
 │   ├── main.py          # FastAPI app and route definitions
 │   ├── db.py            # Database setup and queries
 │   ├── llm.py           # LLM prompt construction and API call
 │   ├── models.py        # Pydantic data models
 │   └── seed_data.py     # Mock assets and incidents for demo
+│
 ├── frontend/
 │   └── index.html       # Dashboard UI
+│
 ├── docker-compose.yml   # Multi-container setup
 ├── Dockerfile           # Backend container definition
 ├── requirements.txt     # Python dependencies
 ├── .env.example         # Environment variable template
 └── README.md
+```
 
 ## Getting Started
 
 ### Prerequisites
+
 - Docker and Docker Compose installed
-- A Groq API key (free at groq.com)
+- A Groq API key (free at [groq.com](https://groq.com))
 
 ### Setup
 
-1. Clone the repository
+**1. Clone the repository**
+
 ```bash
 git clone https://github.com/Pranav14777/sam4-incident-copilot.git
 cd sam4-incident-copilot
 ```
 
-2. Create your environment file
+**2. Create your environment file**
+
 ```bash
 cp .env.example .env
 ```
 
-3. Add your Groq API key to `.env`
-GROQ_API_KEY=your_key_here
+**3. Add your Groq API key to `.env`**
 
-4. Build and run with Docker Compose
+```
+GROQ_API_KEY=your_key_here
+```
+
+**4. Build and run with Docker Compose**
+
 ```bash
 docker-compose up --build
 ```
 
-5. Open the dashboard at `http://localhost:8000`
+**5. Open the dashboard at `http://localhost:8000`**
 
 ## Pipeline Architecture
+
+```
 Incident Payload
-↓
-Asset Context Enrichment (SQLite)
-↓
-LLM Triage (Groq / LLaMA 3)
-↓
+       │
+       ▼
+Asset Context Enrichment
+(SQLite: asset history, criticality, maintenance records)
+       │
+       ▼
+LLM Triage
+(Groq / LLaMA 3: root cause, urgency, recommended action)
+       │
+       ▼
 Validation Rules Engine
-↓
-┌───┴───┐
-↓       ↓
-Work    Slack
-Order   Webhook
-(DB)  (Notification)
-↓
+(escalation logic, uncertainty flagging, approval gates)
+       │
+       ├──────────────────────┐
+       ▼                      ▼
+Work Order Created       Slack Webhook
+(stored in SQLite)       (mock notification)
+       │
+       ▼
 Dashboard UI
+```
 
 ## Example Output
 
 Given an incident with:
-- Asset: Pump-204
-- Indicator: Current unbalance > 10%
-- Failure mode: Stator fault
+- **Asset:** Pump-204
+- **Indicator:** Current unbalance > 10%
+- **Failure mode:** Stator fault
 
 The system generates:
+
 ```json
 {
   "summary": "Pump-204 has shown sustained current unbalance exceeding 10% since detection. Risk of insulation degradation is high.",
