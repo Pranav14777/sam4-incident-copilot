@@ -2,9 +2,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import os
+from dotenv import load_dotenv
 
-from db import init_db, get_all_incidents, get_incident_by_id, get_asset_by_id, get_maintenance_history, get_previous_incidents
+load_dotenv()
+
+from db import (init_db, get_all_incidents, get_incident_by_id,
+                get_asset_by_id, get_maintenance_history,
+                get_previous_incidents, save_recommendation, 
+                save_action, update_incident_status)
 from seed_data import seed
+from llm import call_llm, validate_recommendation
 
 app = FastAPI(title="SAM4 Incident Copilot", version="1.0.0")
 
@@ -66,3 +73,60 @@ def enrich_incident(incident_id: int):
         "previous_incidents": previous,
         "repeat_incident": repeat_incident
     }
+
+@app.post("/incidents/{incident_id}/triage")
+def triage_incident(incident_id: int):
+    # Step 1: Get enriched context
+    incident = get_incident_by_id(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    asset = get_asset_by_id(incident["asset_id"])
+    maintenance = get_maintenance_history(incident["asset_id"])
+    previous = get_previous_incidents(incident["asset_id"], incident_id)
+
+    repeat_incident = False
+    for prev in previous:
+        prev_date = datetime.fromisoformat(prev["detected_at"])
+        curr_date = datetime.fromisoformat(incident["detected_at"])
+        if abs((curr_date - prev_date).days) <= 14:
+            repeat_incident = True
+            break
+
+    enriched = {
+        "incident": incident,
+        "asset": asset,
+        "maintenance_history": maintenance,
+        "previous_incidents": previous,
+        "repeat_incident": repeat_incident
+    }
+
+    # Step 2: Call LLM
+    recommendation = call_llm(enriched)
+
+    # Step 3: Validate against business rules
+    recommendation = validate_recommendation(recommendation, enriched)
+
+    # Step 4: Save recommendation to database
+    recommendation["incident_id"] = incident_id
+    recommendation["created_at"] = datetime.utcnow().isoformat()
+    save_recommendation(recommendation)
+
+    # Step 5: Create draft work order
+    action = {
+        "incident_id": incident_id,
+        "ticket_title": recommendation["ticket_title"],
+        "ticket_body": recommendation["ticket_body"],
+        "status": "draft",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    save_action(action)
+
+    # Step 6: Update incident status
+    update_incident_status(incident_id, "triaged")
+
+    return {
+        "recommendation": recommendation,
+        "work_order": action,
+        "enriched_context": enriched
+    }    
