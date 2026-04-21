@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SAM4 Incident Copilot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: white;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    header .logo {
+      background: #e8630a;
+      color: white;
+      font-weight: 800;
+      font-size: 18px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      letter-spacing: 1px;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 500;
+      color: #cdd3de;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 32px auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1fr 1.6fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #eef0f4;
+      font-weight: 600;
+      font-size: 14px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .incident-item {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f0f2f5;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .incident-item:hover { background: #f7f8fc; }
+    .incident-item.active { background: #eef3ff; border-left: 3px solid #3b5bdb; }
+
+    .badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge-critical { background: #ffe0e0; color: #c0392b; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+    .badge-monitoring { background: #e8f4fd; color: #1a6fa8; }
+    .badge-resolved { background: #e8f5e9; color: #2e7d32; }
+    .badge-triaged { background: #f3e5f5; color: #6a1b9a; }
+    .badge-open { background: #fff3e0; color: #e65100; }
+
+    .incident-info { flex: 1; min-width: 0; }
+    .incident-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+    .incident-sub { font-size: 12px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .detail-panel { padding: 24px; }
+
+    .empty-state {
+      padding: 48px 24px;
+      text-align: center;
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    .asset-passport {
+      background: #f7f8fc;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .passport-item { font-size: 13px; }
+    .passport-label { color: #888; font-size: 11px; text-transform: uppercase; }
+    .passport-value { font-weight: 600; color: #1a1a2e; }
+
+    .triage-btn {
+      width: 100%;
+      padding: 12px;
+      background: #e8630a;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 20px;
+    }
+
+    .triage-btn:hover { background: #cf5609; }
+    .triage-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    .recommendation-card {
+      background: #f7f8fc;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .rec-section { margin-bottom: 14px; }
+    .rec-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #888;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .rec-value { font-size: 13px; color: #1a1a2e; line-height: 1.5; }
+
+    .urgency-pill {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .urgency-critical { background: #ffe0e0; color: #c0392b; }
+    .urgency-high { background: #fff3cd; color: #856404; }
+    .urgency-medium { background: #e8f4fd; color: #1a6fa8; }
+    .urgency-low { background: #e8f5e9; color: #2e7d32; }
+
+    .notify-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .notify-tag {
+      background: #e8eaf6;
+      color: #3949ab;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+    }
+
+    .ticket-box {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 12px;
+      color: #444;
+      line-height: 1.6;
+    }
+
+    .ticket-title {
+      font-weight: 700;
+      font-size: 13px;
+      color: #1a1a2e;
+      margin-bottom: 6px;
+    }
+
+    .notification-bar {
+      margin-top: 14px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .notif-mock { background: #e8f5e9; color: #2e7d32; }
+    .notif-sent { background: #e8f5e9; color: #2e7d32; }
+    .notif-failed { background: #ffe0e0; color: #c0392b; }
+
+    .flags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+    .flag {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .flag-yes { background: #ffe0e0; color: #c0392b; }
+    .flag-no { background: #e8f5e9; color: #2e7d32; }
+
+    .loading {
+      text-align: center;
+      padding: 24px;
+      color: #888;
+      font-size: 14px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #ddd;
+      border-top-color: #e8630a;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .count-badge {
+      background: #e8630a;
+      color: white;
+      border-radius: 20px;
+      padding: 2px 8px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">SAM4</div>
+  <h1>Incident Copilot — AI-Powered Triage & Workflow Automation</h1>
+</header>
+
+<div class="container">
+
+  <!-- LEFT: Incident List -->
+  <div class="card">
+    <div class="card-header">
+      Open Incidents
+      <span class="count-badge" id="incident-count">0</span>
+    </div>
+    <div id="incident-list">
+      <div class="loading">Loading incidents...</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Detail + Triage Panel -->
+  <div class="card">
+    <div class="card-header">Incident Detail & AI Triage</div>
+    <div class="detail-panel" id="detail-panel">
+      <div class="empty-state">
+        Select an incident from the list to view details and run AI triage.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API = 'http://127.0.0.1:8000';
+  let selectedIncident = null;
+
+  function severityBadge(severity, status) {
+    if (status === 'resolved') return `<span class="badge badge-resolved">Resolved</span>`;
+    if (status === 'triaged') return `<span class="badge badge-triaged">Triaged</span>`;
+    if (severity === 'critical') return `<span class="badge badge-critical">Requires Immediate Action</span>`;
+    return `<span class="badge badge-warning">Requires Action</span>`;
+  }
+
+  function urgencyPill(urgency) {
+    return `<span class="urgency-pill urgency-${urgency}">${urgency}</span>`;
+  }
+
+  async function loadIncidents() {
+    const res = await fetch(`${API}/incidents`);
+    const data = await res.json();
+    const list = document.getElementById('incident-list');
+    const count = document.getElementById('incident-count');
+    const incidents = data.incidents;
+    count.textContent = incidents.filter(i => i.status === 'open').length;
+
+    list.innerHTML = incidents.map(inc => `
+      <div class="incident-item" onclick="selectIncident(${inc.id})" id="inc-${inc.id}">
+        <div class="incident-info">
+          <div class="incident-name">${inc.asset_name}</div>
+          <div class="incident-sub">${inc.indicator} · ${inc.location}</div>
+        </div>
+        ${severityBadge(inc.severity, inc.status)}
+      </div>
+    `).join('');
+  }
+
+  async function selectIncident(id) {
+    document.querySelectorAll('.incident-item').forEach(el => el.classList.remove('active'));
+    document.getElementById(`inc-${id}`).classList.add('active');
+
+    const panel = document.getElementById('detail-panel');
+    panel.innerHTML = `<div class="loading"><span class="spinner"></span>Loading...</div>`;
+
+    const res = await fetch(`${API}/incidents/${id}/enrich`);
+    const data = await res.json();
+    selectedIncident = data;
+
+    const inc = data.incident;
+    const asset = data.asset;
+    const maint = data.maintenance_history;
+    const repeat = data.repeat_incident;
+
+    panel.innerHTML = `
+      <div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-weight:700;font-size:16px">${inc.asset_name}</span>
+          ${severityBadge(inc.severity, inc.status)}
+        </div>
+        <div style="font-size:13px;color:#666;margin-bottom:4px">
+          📍 ${inc.location} &nbsp;·&nbsp; 🕐 ${inc.detected_at}
+        </div>
+        <div style="font-size:13px;color:#444">
+          <strong>Indicator:</strong> ${inc.indicator} &nbsp;·&nbsp;
+          <strong>Failure Mode:</strong> ${inc.failure_mode}
+        </div>
+        ${repeat ? `<div style="margin-top:8px;padding:6px 12px;background:#fff3cd;border-radius:6px;font-size:12px;color:#856404;font-weight:600">⚠️ Repeat incident detected within 14 days — auto-escalation applied</div>` : ''}
+      </div>
+
+      <div class="asset-passport">
+        <div class="passport-item">
+          <div class="passport-label">Asset Type</div>
+          <div class="passport-value">${asset.asset_type}</div>
+        </div>
+        <div class="passport-item">
+          <div class="passport-label">Industry</div>
+          <div class="passport-value">${asset.industry}</div>
+        </div>
+        <div class="passport-item">
+          <div class="passport-label">Criticality</div>
+          <div class="passport-value">${asset.criticality.toUpperCase()}</div>
+        </div>
+        <div class="passport-item">
+          <div class="passport-label">Rated Power</div>
+          <div class="passport-value">${asset.rated_power_kw} kW</div>
+        </div>
+        <div class="passport-item">
+          <div class="passport-label">Voltage / Current</div>
+          <div class="passport-value">${asset.voltage_v}V / ${asset.current_a}A</div>
+        </div>
+        <div class="passport-item">
+          <div class="passport-label">RPM / Efficiency</div>
+          <div class="passport-value">${asset.rpm} / ${asset.efficiency}</div>
+        </div>
+        <div class="passport-item">
+          <div class="passport-label">Transmission</div>
+          <div class="passport-value">${asset.transmission_type}</div>
+        </div>
+        <div class="passport-item">
+          <div class="passport-label">Downtime Cost</div>
+          <div class="passport-value">€${asset.downtime_cost_per_hour}/hr</div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:#888;margin-bottom:16px">
+        <strong style="color:#444">Maintenance History:</strong>
+        ${maint.length === 0 ? ' No records found' : maint.map(m =>
+          `<div style="margin-top:4px">· [${m.performed_at.split(' ')[0]}] ${m.maintenance_type}: ${m.description}</div>`
+        ).join('')}
+      </div>
+
+      <button class="triage-btn" onclick="runTriage(${inc.id})" 
+        ${inc.status === 'triaged' || inc.status === 'resolved' ? 'disabled' : ''}>
+        ${inc.status === 'triaged' ? '✅ Already Triaged' : inc.status === 'resolved' ? '✅ Resolved' : '⚡ Run AI Triage'}
+      </button>
+
+      <div id="triage-result"></div>
+    `;
+  }
+
+  async function runTriage(id) {
+    const btn = document.querySelector('.triage-btn');
+    const result = document.getElementById('triage-result');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Analysing with AI...';
+    result.innerHTML = '';
+
+    try {
+      const res = await fetch(`${API}/incidents/${id}/triage`, { method: 'POST' });
+      const data = await res.json();
+      const rec = data.recommendation;
+      const notif = data.notification;
+
+      btn.innerHTML = '✅ Triage Complete';
+
+      result.innerHTML = `
+        <div class="recommendation-card">
+          <div class="rec-section">
+            <div class="rec-label">Urgency</div>
+            ${urgencyPill(rec.urgency)}
+          </div>
+          <div class="rec-section">
+            <div class="rec-label">Summary</div>
+            <div class="rec-value">${rec.summary}</div>
+          </div>
+          <div class="rec-section">
+            <div class="rec-label">Likely Root Cause</div>
+            <div class="rec-value">${rec.likely_root_cause}</div>
+          </div>
+          <div class="rec-section">
+            <div class="rec-label">Recommended Action</div>
+            <div class="rec-value">${rec.recommended_action}</div>
+          </div>
+          <div class="rec-section">
+            <div class="rec-label">Notify</div>
+            <div class="notify-tags">
+              ${rec.notify.map(n => `<span class="notify-tag">${n}</span>`).join('')}
+            </div>
+          </div>
+          <div class="rec-section">
+            <div class="rec-label">Flags</div>
+            <div class="flags">
+              <span class="flag ${rec.human_review_required ? 'flag-yes' : 'flag-no'}">
+                Human Review: ${rec.human_review_required ? 'Required' : 'Not Required'}
+              </span>
+              <span class="flag ${rec.uncertainty_flagged ? 'flag-yes' : 'flag-no'}">
+                Uncertainty: ${rec.uncertainty_flagged ? 'Flagged' : 'None'}
+              </span>
+            </div>
+          </div>
+          <div class="rec-section">
+            <div class="rec-label">Draft Work Order</div>
+            <div class="ticket-box">
+              <div class="ticket-title">${rec.ticket_title}</div>
+              ${rec.ticket_body}
+            </div>
+          </div>
+          <div class="notification-bar notif-${notif.status}">
+            📣 Notification: ${notif.status === 'mock_sent' ? '✅ Mock Slack notification sent' : notif.status === 'sent' ? '✅ Slack notification sent' : '❌ Notification failed'} — ${notif.message}
+          </div>
+        </div>
+      `;
+
+      loadIncidents();
+
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = '⚡ Run AI Triage';
+      result.innerHTML = `<div style="color:red;font-size:13px;margin-top:8px">Error: ${err.message}</div>`;
+    }
+  }
+
+  loadIncidents();
+</script>
+</body>
+</html>
