@@ -8,10 +8,11 @@ load_dotenv()
 
 from db import (init_db, get_all_incidents, get_incident_by_id,
                 get_asset_by_id, get_maintenance_history,
-                get_previous_incidents, save_recommendation, 
+                get_previous_incidents, save_recommendation,
                 save_action, update_incident_status)
 from seed_data import seed
 from llm import call_llm, validate_recommendation
+from notifications import send_slack_notification
 
 app = FastAPI(title="SAM4 Incident Copilot", version="1.0.0")
 
@@ -74,6 +75,7 @@ def enrich_incident(incident_id: int):
         "repeat_incident": repeat_incident
     }
 
+
 @app.post("/incidents/{incident_id}/triage")
 def triage_incident(incident_id: int):
     # Step 1: Get enriched context
@@ -125,8 +127,28 @@ def triage_incident(incident_id: int):
     # Step 6: Update incident status
     update_incident_status(incident_id, "triaged")
 
+    # Step 7: Send Slack notification
+    notification = send_slack_notification(recommendation, incident, asset)
+
     return {
         "recommendation": recommendation,
         "work_order": action,
+        "notification": notification,
         "enriched_context": enriched
-    }    
+    }
+
+
+@app.get("/notifications")
+def list_notifications():
+    import sqlite3
+    db_path = os.getenv("DB_PATH", "sam4.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM notification_log ORDER BY sent_at DESC"
+        ).fetchall()
+        conn.close()
+        return {"notifications": [dict(r) for r in rows]}
+    except Exception:
+        return {"notifications": []}
